@@ -8,7 +8,7 @@ SomeClass::SomeClass() {
 }
 
 int function() {
-	return 1337;
+	return 22;
 }
 
 }
