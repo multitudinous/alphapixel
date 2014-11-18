@@ -1,3 +1,9 @@
+# This policy was introduced in 3.0.0 and does not allow targets named "test" or "help" ...
+# Since we do not rely on cmake testing we stick to the old policy for now.
+if(POLICY CMP0037)
+    cmake_policy(SET CMP0037 OLD)
+endif()
+
 PROJECT(LandsatLook)
 
 # Standard project setup.
@@ -17,7 +23,7 @@ ADD_LIBRARY(LandsatLook SHARED
 	"src/LandsatLook.h"
 )
 
-ADD_EXECUTABLE(test "test/test.cpp")
+ADD_EXECUTABLE(testprogram "test/test.cpp")
 
 TARGET_LINK_LIBRARIES(LandsatLook ${GDAL_LIBRARY})
 TARGET_LINK_LIBRARIES(test LandsatLook)
