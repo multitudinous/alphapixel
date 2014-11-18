@@ -26,7 +26,7 @@ ADD_LIBRARY(LandsatLook SHARED
 ADD_EXECUTABLE(testprogram "test/test.cpp")
 
 TARGET_LINK_LIBRARIES(LandsatLook ${GDAL_LIBRARY})
-TARGET_LINK_LIBRARIES(test LandsatLook)
+TARGET_LINK_LIBRARIES(testprogram LandsatLook)
 
 # DOXYGEN Setup.
 OPTION(BUILD_DOCUMENTATION "Enable to create build target for Doxygen documentation." OFF)
