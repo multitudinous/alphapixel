@@ -21,6 +21,8 @@ LINK_DIRECTORIES(${GDAL_LIBRARY_DIR})
 ADD_LIBRARY(LandsatLook SHARED
 	"src/LandsatLook.cpp"
 	"src/LandsatLook.h"
+	"src/ConfigFile.cpp"
+	"src/ConfigFile.h"
 )
 
 ADD_EXECUTABLE(testprogram "test/test.cpp")
