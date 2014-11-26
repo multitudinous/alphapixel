@@ -10,6 +10,8 @@
 #include <map>
 #include <fstream>
 
+namespace landsatlook {
+
 void exitWithError(const std::string &error, bool exitNow = true );
 
 class Convert
@@ -80,3 +82,4 @@ public:
 
 };
 
+}

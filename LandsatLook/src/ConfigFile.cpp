@@ -6,6 +6,8 @@
 
 #include "ConfigFile.h"
 
+namespace landsatlook {
+
 void exitWithError(const std::string &error, bool exitNow )
 {
 	std::cout << error;
@@ -133,3 +135,4 @@ bool ConfigFile::keyExists(const std::string &key) const
 	return contents.find(key) != contents.end();
 }
 
+}

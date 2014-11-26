@@ -1,7 +1,7 @@
 #include <LandsatLook.h>
 
 int main(int argc, char** argv) {
-	landsatlook::SomeClass sc;
+	landsatlook::LandsatLook sc;
 
 	sc.Operate();
 
