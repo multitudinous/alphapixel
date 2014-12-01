@@ -121,13 +121,19 @@ typedef std::map< int, ImageBandData * > ImageBandMap;
 
 class LANDSATLOOK_EXPORT LandsatLook {
 public:
-	LandsatLook();
+	LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot );
 	void InitGDAL() const;
-	GDALDataset* OpenLandsatBand( std::string &rootFileName, int bandNumber ) const;
+	GDALDataset* OpenLandsatBand( std::string &landsatBandFileRoot, int bandNumber ) const;
 	bool ComputeFarmCellBounds( const MTLParse *config, double &ULX, double &ULY, double &LRX, double &LRY, int &startCol, int &startRow, int &cols, int &rows ) const;
 	void SetGeoRefFromLandsat( GDALDataset *targetDataset, ImageBandMap &imageBands, int startCol, int startRow ) const;
 	bool Operate();
+	bool ExportNDVI( MTLParse *parse );
+	bool ExportNDTI( MTLParse *parse );
 
+	bool m_exportNDVI;
+	bool m_exportNDTI;
+	std::string m_landsatPath;
+	std::string m_landsatFileRoot;
 	int m_ULCellX;
 	int m_ULCellY;
 	int m_LRCellX;

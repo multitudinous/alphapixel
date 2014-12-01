@@ -311,7 +311,16 @@ double ImageBandData::TOACorrectOnePixel( int pixelNumber )
 	return m_toa->ComputeTOAReflectance( static_cast< double >( m_OneDataLine[ pixelNumber ] ) );
 }
 
-LandsatLook::LandsatLook()
+LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot ) :
+	m_exportNDVI( exportNDVI ),
+	m_exportNDTI( exportNDTI ),
+	m_landsatPath( landsatPath ),
+	m_landsatFileRoot( landsatFileRoot ),
+	m_ULCellX( 0 ),
+	m_ULCellY( 0 ),
+	m_LRCellX( 0 ),
+	m_LRCellY( 0 )
+
 {
 	InitGDAL();
 }
@@ -321,13 +330,13 @@ void LandsatLook::InitGDAL() const
 	GDALAllRegister();
 }
 
-GDALDataset* LandsatLook::OpenLandsatBand( std::string &rootFileName, int bandNumber ) const
+GDALDataset* LandsatLook::OpenLandsatBand( std::string &landsatBandFileRoot, int bandNumber ) const
 {
 	GDALDataset* bandDataset = NULL;
 	char bandChar[12];
 
 	sprintf_s( bandChar, "%d", bandNumber );
-	std::string filename = rootFileName;
+	std::string filename = landsatBandFileRoot;
 	filename += bandChar;
 	filename += ".TIF";
 	bandDataset = (GDALDataset *) GDALOpen( filename.c_str(), GA_ReadOnly );
@@ -447,27 +456,41 @@ void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, ImageBandMap
 	}
 }
 
+#define OUTPUT_SIZE float
+#define OUTPUT_RASTER_TYPE GDT_Float32
+//#define SEPARATE_OUTPUTS
+
 bool LandsatLook::Operate()
 {
 	bool success = true;
 	MTLParse *parse;
-	std::string rootFilepath = "C:\\Data\\Dev\\AgSolver-AlphaPixel\\alphapixel\\LandsatLook\\Data\\LC80260312014079LGN00_";
+	std::string baseFile = m_landsatPath;
+	baseFile += m_landsatFileRoot;
 	
-	std::string filename = rootFilepath;
-	filename += "MTL.txt";
-	parse = new MTLParse( filename );
+	std::string MTLFilename = baseFile;
+	MTLFilename += "MTL.txt";
+	parse = new MTLParse( MTLFilename );
 	if ( parse )
 	{
 		success = parse->ParseSuccess();
-
+#ifdef SEPARATE_OUTPUTS
+		if ( success && m_exportNDVI )
+		{
+			success = ExportNDVI( parse );
+		}
+		if (success &&  m_exportNDTI )
+		{
+			success = ExportNDTI( parse );
+		}
+#else
+		
 		// One list of all the bands required for both calculated indices.
 		std::map< int, double > bands;
-
-		NDTI ndti( bands );
 		NDVI ndvi( bands );
+		NDTI ndti( bands );
 
 		// Load the Landsat bands from their files into GDAL rasters
-		std::string rootImageName = rootFilepath;
+		std::string rootImageName = baseFile;
 		rootImageName += "B";
 		ImageBandMap imageBands;
 
@@ -563,14 +586,14 @@ bool LandsatLook::Operate()
 				}
 				// Create new output GDAL datasets for NDVI and NDTI
 				char **createOptions = NULL;
-				ndviDataset = driver->Create( outputNDVIname.c_str(), cols, rows, 1, GDT_Float32, createOptions );
+				ndviDataset = driver->Create( outputNDVIname.c_str(), cols, rows, 1, OUTPUT_RASTER_TYPE, createOptions );
 				if ( ndviDataset == NULL )
 				{
 					std::cout << outputNDVIname << CPLGetLastErrorMsg() << std::endl;
 					std::cout << "Operation failed." << std::endl;
 					success = false;
 				}
-				ndtiDataset = driver->Create( outputNDTIname.c_str(), cols, rows, 1, GDT_Float32, createOptions );
+				ndtiDataset = driver->Create( outputNDTIname.c_str(), cols, rows, 1, OUTPUT_RASTER_TYPE, createOptions );
 				if ( ndtiDataset == NULL )
 				{
 					std::cout << outputNDTIname << CPLGetLastErrorMsg() << std::endl;
@@ -581,23 +604,24 @@ bool LandsatLook::Operate()
 
 			if ( success )
 			{
+				GDALRasterBand *ndviBand = NULL;
+				GDALRasterBand *ndtiBand = NULL;
 				SetGeoRefFromLandsat( ndviDataset, imageBands, startCol, startRow );
 				SetGeoRefFromLandsat( ndtiDataset, imageBands, startCol, startRow );
 				// Get the raster band pointers
-				GDALRasterBand *ndviBand = ndviDataset->GetRasterBand( 1 );
-				GDALRasterBand *ndtiBand = ndtiDataset->GetRasterBand( 1 );
-
-				// Just checking.
+				ndviBand = ndviDataset->GetRasterBand( 1 );
+				ndtiBand = ndtiDataset->GetRasterBand( 1 );
+				// Just checking. Debug code.
 				int outRows, outCols, outBands;
 				outCols = ndviDataset->GetRasterXSize();
 				outRows = ndviDataset->GetRasterYSize();
 				outBands = ndviDataset->GetRasterCount();
-				outCols = ndtiBand->GetXSize();
-				outRows = ndtiBand->GetYSize();
-
+				outCols = ndviBand->GetXSize();
+				outRows = ndviBand->GetYSize();
+					
 				// Create single lines of memory for output
-				float *computedNDVI = ( float * )CPLMalloc( sizeof( float ) * cols );
-				float *computedNDTI = ( float * )CPLMalloc( sizeof( float ) * cols );
+				OUTPUT_SIZE *computedNDVI = ( OUTPUT_SIZE * )CPLMalloc( sizeof( OUTPUT_SIZE ) * cols );
+				OUTPUT_SIZE *computedNDTI = ( OUTPUT_SIZE * )CPLMalloc( sizeof( OUTPUT_SIZE ) * cols );
 				// Iterate through rows of landsat imagery, each band
 				for ( int row = 0; row < rows; ++row )
 				{
@@ -618,11 +642,11 @@ bool LandsatLook::Operate()
 						}
 						// Feed the pixel's digital numbers into the calculators for NDVI and NDTI
 						// Store the calculated NDTI and NDVI values in their own one line buffers
-						computedNDVI[ col ] = static_cast< float >( ndvi.ComputeIndex( bands ) );
-						computedNDTI[ col ] = static_cast< float >( ndti.ComputeIndex( bands ) );
+						computedNDVI[ col ] = static_cast< OUTPUT_SIZE >( ndvi.ComputeIndex( bands ) );
+						computedNDTI[ col ] = static_cast< OUTPUT_SIZE >( ndti.ComputeIndex( bands ) );
 					}
 					// Write a line of data at a time into output rasters
-					CPLErr cplErr = ndviBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDVI, cols, 1, GDT_Float32, 0, 0 );
+					CPLErr cplErr = ndviBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDVI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
 					if ( cplErr == CE_Failure )
 					{
 						const char*errorMsg = CPLGetLastErrorMsg();
@@ -630,7 +654,7 @@ bool LandsatLook::Operate()
 						success = false;
 						break;
 					}
-					cplErr = ndtiBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDTI, cols, 1, GDT_Float32, 0, 0 );
+					cplErr = ndtiBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDTI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
 					if ( cplErr == CE_Failure )
 					{
 						const char*errorMsg = CPLGetLastErrorMsg();
@@ -638,20 +662,22 @@ bool LandsatLook::Operate()
 						success = false;
 						break;
 					}
-					
 				}
+				// CPLFree() is broken and crashes. -Gary Huber
+				//CPLFree( computedNDVI );
+				//CPLFree( computedNDTI );
 			}
 			if ( success )
 			{
 				ndviDataset->FlushCache();
-				ndtiDataset->FlushCache();
 				GDALClose ( (GDALDatasetH)ndviDataset );
+				ndtiDataset->FlushCache();
 				GDALClose ( (GDALDatasetH)ndtiDataset );
 			}
 
 		}
-
-		// Crashes if deleting the ImageBandData member or the members within it.
+#endif
+		// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
 		/*
 		for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
 		{
@@ -665,6 +691,368 @@ bool LandsatLook::Operate()
 	{
 		success = false;
 	}
+
+	return success;
+}
+
+bool LandsatLook::ExportNDVI( MTLParse *parse )
+{
+	bool success = true;
+	std::string baseFile = m_landsatPath;
+	baseFile += m_landsatFileRoot;
+
+	// One list of all the bands required for both calculated indices.
+	std::map< int, double > bands;
+	NDVI ndvi( bands );
+
+	// Load the Landsat bands from their files into GDAL rasters
+	std::string rootImageName = baseFile;
+	rootImageName += "B";
+	ImageBandMap imageBands;
+
+	// Crop to farm boundary in UTM coords
+	// NW: UTM ( WGS84 ) - ( 476012.685, 4658427.925 )
+	// SE: UTM ( WGS84 ) - ( 477569.273, 4656871.337 )
+	double ULX = 476012.685;
+	double ULY = 4658427.925;
+	double LRX = 477569.273;
+	double LRY = 4656871.337;
+	int startCol, startRow, cols, rows;
+	success = ComputeFarmCellBounds( parse, ULX, ULY, LRX, LRY, startCol, startRow, cols, rows );
+	if ( success )
+	{
+		for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
+		{
+			int bandNumber = it->first;
+			TopOfAtmosphere *toa = new TopOfAtmosphere( parse, bandNumber );
+			if ( toa )
+			{
+				GDALDataset *bandRaster = OpenLandsatBand( rootImageName, bandNumber );
+				if ( bandRaster )
+				{
+					unsigned short int *bData = ( unsigned short int * )CPLMalloc( sizeof( unsigned short int ) * cols );
+					if ( bData )
+					{
+						ImageBandData *ibd = new ImageBandData( bandRaster, bData, toa );
+						imageBands.insert( std::pair< int, ImageBandData * >( bandNumber, ibd ) );
+					}
+					else
+					{
+						std::cout << "Error allocating one line of band image memory. Band " << bandNumber << std::endl;
+						success = false;
+						break;
+					}
+				}
+				else
+				{
+					// Failed to open the band file, fail gracefully.
+					std::cout << "Error opening band file. Band " << bandNumber << std::endl;
+					success = false;
+					break;
+				}
+			}
+			else
+			{
+				// Failed to open the band file, fail gracefully.
+				std::cout << "Error determining top of atmosphere correction factors. Band " << bandNumber << std::endl;
+				success = false;
+				break;
+			}
+		}
+	}
+	else
+	{
+		std::cout << "Bounds are outside of the Landsat scene." << std::endl;
+	}
+
+	if ( success )
+	{
+		GDALDataset *ndviDataset = NULL;
+		// Create a geoTIF for both outputs in single precision float format
+		// written to the default project directory since no path specified here.
+		std::string outputNDVIname = "LandsatLookNDVI";
+		GDALDriverManager *Mgr = GetGDALDriverManager();
+		GDALDriver *driver = Mgr->GetDriverByName( "GTiff" );
+		if ( driver )
+		{
+			outputNDVIname += ".tif";
+		}
+		else
+		{
+			success = false;
+		}
+		if ( success )
+		{
+			// Close previously created files. Seems to mess up the process of writing to the
+			// output rasters if not created from scratch each time.
+			FILE *ffile;
+			if ( ffile = fopen( outputNDVIname.c_str(), "rb" ))
+			{
+				fclose( ffile );
+				remove( outputNDVIname.c_str() );
+			}
+			// Create new output GDAL datasets for NDVI
+			char **createOptions = NULL;
+			ndviDataset = driver->Create( outputNDVIname.c_str(), cols, rows, 1, OUTPUT_RASTER_TYPE, createOptions );
+			if ( ndviDataset == NULL )
+			{
+				std::cout << outputNDVIname << CPLGetLastErrorMsg() << std::endl;
+				std::cout << "Operation failed." << std::endl;
+				success = false;
+			}
+		}
+
+		if ( success )
+		{
+			GDALRasterBand *ndviBand = NULL;
+			SetGeoRefFromLandsat( ndviDataset, imageBands, startCol, startRow );
+			// Get the raster band pointers
+			ndviBand = ndviDataset->GetRasterBand( 1 );
+			// Just checking. Debug code.
+			int outRows, outCols, outBands;
+			outCols = ndviDataset->GetRasterXSize();
+			outRows = ndviDataset->GetRasterYSize();
+			outBands = ndviDataset->GetRasterCount();
+			outCols = ndviBand->GetXSize();
+			outRows = ndviBand->GetYSize();
+					
+			// Create single lines of memory for output
+			OUTPUT_SIZE *computedNDVI = ( OUTPUT_SIZE * )CPLMalloc( sizeof( OUTPUT_SIZE ) * cols );
+			// Iterate through rows of landsat imagery, each band
+			for ( int row = 0; row < rows; ++row )
+			{
+				for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+				{
+					ImageBandData *bandData = it->second;
+					// Copy one line at a time into active buffers
+					bandData->RetrieveOneDataLine( row + startRow, startCol, cols );
+				}
+				// Iterate through the pixels in each buffer
+				for ( int col = 0; col < cols; ++col )
+				{
+					for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+					{
+						ImageBandData *bandData = it->second;
+						double correctedValue = bandData->TOACorrectOnePixel( col );
+						bands[ it->first ] = correctedValue;
+					}
+					// Feed the pixel's digital numbers into the calculators for NDVI
+					// Store the calculated NDVI values in its own one line buffer
+					computedNDVI[ col ] = static_cast< OUTPUT_SIZE >( ndvi.ComputeIndex( bands ) );
+				}
+				// Write a line of data at a time into output rasters
+				CPLErr cplErr = ndviBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDVI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
+				if ( cplErr == CE_Failure )
+				{
+					const char*errorMsg = CPLGetLastErrorMsg();
+					std::cout << "Error writing NDVI data. " << errorMsg << std::endl;
+					success = false;
+					break;
+				}
+			}
+			// CPLFree() is broken and crashes. -Gary Huber
+			//CPLFree( computedNDVI );
+		}
+		if ( success )
+		{
+			if ( ndviDataset )
+			{
+				ndviDataset->FlushCache();
+				GDALClose ( (GDALDatasetH)ndviDataset );
+			}
+		}
+
+	}
+
+	// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
+	/*
+	for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+	{
+		ImageBandData *bandData = it->second;
+		bandData->Cleanup();
+	}
+	*/
+
+	return success;
+}
+
+bool LandsatLook::ExportNDTI( MTLParse *parse )
+{
+	bool success = true;
+	std::string baseFile = m_landsatPath;
+	baseFile += m_landsatFileRoot;
+
+	// One list of all the bands required for both calculated indices.
+	std::map< int, double > bands;
+	NDTI ndti( bands );
+
+	// Load the Landsat bands from their files into GDAL rasters
+	std::string rootImageName = baseFile;
+	rootImageName += "B";
+	ImageBandMap imageBands;
+
+	// Crop to farm boundary in UTM coords
+	// NW: UTM ( WGS84 ) - ( 476012.685, 4658427.925 )
+	// SE: UTM ( WGS84 ) - ( 477569.273, 4656871.337 )
+	double ULX = 476012.685;
+	double ULY = 4658427.925;
+	double LRX = 477569.273;
+	double LRY = 4656871.337;
+	int startCol, startRow, cols, rows;
+	success = ComputeFarmCellBounds( parse, ULX, ULY, LRX, LRY, startCol, startRow, cols, rows );
+	if ( success )
+	{
+		for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
+		{
+			int bandNumber = it->first;
+			TopOfAtmosphere *toa = new TopOfAtmosphere( parse, bandNumber );
+			if ( toa )
+			{
+				GDALDataset *bandRaster = OpenLandsatBand( rootImageName, bandNumber );
+				if ( bandRaster )
+				{
+					unsigned short int *bData = ( unsigned short int * )CPLMalloc( sizeof( unsigned short int ) * cols );
+					if ( bData )
+					{
+						ImageBandData *ibd = new ImageBandData( bandRaster, bData, toa );
+						imageBands.insert( std::pair< int, ImageBandData * >( bandNumber, ibd ) );
+					}
+					else
+					{
+						std::cout << "Error allocating one line of band image memory. Band " << bandNumber << std::endl;
+						success = false;
+						break;
+					}
+				}
+				else
+				{
+					// Failed to open the band file, fail gracefully.
+					std::cout << "Error opening band file. Band " << bandNumber << std::endl;
+					success = false;
+					break;
+				}
+			}
+			else
+			{
+				// Failed to open the band file, fail gracefully.
+				std::cout << "Error determining top of atmosphere correction factors. Band " << bandNumber << std::endl;
+				success = false;
+				break;
+			}
+		}
+	}
+	else
+	{
+		std::cout << "Bounds are outside of the Landsat scene." << std::endl;
+	}
+
+	if ( success )
+	{
+		GDALDataset *ndtiDataset = NULL;
+		// Create a geoTIF for both outputs in single precision float format
+		// written to the default project directory since no path specified here.
+		std::string outputNDTIname = "LandsatLookNDTI";
+		GDALDriverManager *Mgr = GetGDALDriverManager();
+		GDALDriver *driver = Mgr->GetDriverByName( "GTiff" );
+		if ( driver )
+		{
+			outputNDTIname += ".tif";
+		}
+		else
+		{
+			success = false;
+		}
+		if ( success )
+		{
+			// Close previously created files. Seems to mess up the process of writing to the
+			// output rasters if not created from scratch each time.
+			FILE *ffile;
+			if ( ffile = fopen( outputNDTIname.c_str(), "rb" ))
+			{
+				fclose( ffile );
+				remove( outputNDTIname.c_str() );
+			}
+			// Create new output GDAL datasets for NDTI
+			char **createOptions = NULL;
+			ndtiDataset = driver->Create( outputNDTIname.c_str(), cols, rows, 1, OUTPUT_RASTER_TYPE, createOptions );
+			if ( ndtiDataset == NULL )
+			{
+				std::cout << outputNDTIname << CPLGetLastErrorMsg() << std::endl;
+				std::cout << "Operation failed." << std::endl;
+				success = false;
+			}
+		}
+
+		if ( success )
+		{
+			GDALRasterBand *ndtiBand = NULL;
+			SetGeoRefFromLandsat( ndtiDataset, imageBands, startCol, startRow );
+			// Get the raster band pointers
+			ndtiBand = ndtiDataset->GetRasterBand( 1 );
+			// Just checking. Debug code.
+			int outRows, outCols, outBands;
+			outCols = ndtiDataset->GetRasterXSize();
+			outRows = ndtiDataset->GetRasterYSize();
+			outBands = ndtiDataset->GetRasterCount();
+			outCols = ndtiBand->GetXSize();
+			outRows = ndtiBand->GetYSize();
+					
+			// Create single lines of memory for output
+			OUTPUT_SIZE *computedNDTI = ( OUTPUT_SIZE * )CPLMalloc( sizeof( OUTPUT_SIZE ) * cols );
+			// Iterate through rows of landsat imagery, each band
+			for ( int row = 0; row < rows; ++row )
+			{
+				for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+				{
+					ImageBandData *bandData = it->second;
+					// Copy one line at a time into active buffers
+					bandData->RetrieveOneDataLine( row + startRow, startCol, cols );
+				}
+				// Iterate through the pixels in each buffer
+				for ( int col = 0; col < cols; ++col )
+				{
+					for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+					{
+						ImageBandData *bandData = it->second;
+						double correctedValue = bandData->TOACorrectOnePixel( col );
+						bands[ it->first ] = correctedValue;
+					}
+					// Feed the pixel's digital numbers into the calculators for NDTI
+					// Store the calculated NDTI values in its own one line buffer
+					computedNDTI[ col ] = static_cast< OUTPUT_SIZE >( ndti.ComputeIndex( bands ) );
+				}
+				// Write a line of data at a time into output rasters
+				CPLErr cplErr = ndtiBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDTI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
+				if ( cplErr == CE_Failure )
+				{
+					const char*errorMsg = CPLGetLastErrorMsg();
+					std::cout << "Error writing NDTI data. " << errorMsg << std::endl;
+					success = false;
+					break;
+				}
+			}
+			// CPLFree() is broken and crashes. -Gary Huber
+			//CPLFree( computedNDTI );
+		}
+		if ( success )
+		{
+			if ( ndtiDataset )
+			{
+				ndtiDataset->FlushCache();
+				GDALClose ( (GDALDatasetH)ndtiDataset );
+			}
+		}
+
+	}
+
+	// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
+	/*
+	for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
+	{
+		ImageBandData *bandData = it->second;
+		bandData->Cleanup();
+	}
+	*/
 
 	return success;
 }
