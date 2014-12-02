@@ -75,45 +75,45 @@ private:
 class NormalizedIndex
 {
 public:
-	NormalizedIndex()	{};
-	void SetBandNumbers( std::map< int, double > &bands, const int *requiredBands );
-	virtual void SetBandNumbers( std::map< int, double > &bands ) = 0;
-	virtual double ComputeIndex( std::map< int, double > &bands ) = 0;
+	NormalizedIndex( std::map< int, double > &bands, int *reqBands );
+	double ComputeIndex( std::map< int, double > &bands );
 	double ComputeIndex( double reflectance1, double reflectance2 );
+
+	std::vector< int > m_reqBands;
 };
 
 class NDVI : public NormalizedIndex
 {
 public:
 	NDVI( std::map< int, double > &bands );
-	void SetBandNumbers( std::map< int, double > &bands );
-	double ComputeIndex( std::map< int, double > &bands );
+
 };
 
 class NDTI : public NormalizedIndex
 {
 public:
 	NDTI( std::map< int, double > &bands );
-	void SetBandNumbers( std::map< int, double > &bands );
-	double ComputeIndex(  std::map< int, double > &bands );
+
 };
+
+#define INPUT_SIZE unsigned short int
+#define INPUT_RASTER_TYPE GDT_UInt16
 
 class ImageBandData
 {
 public:
 	ImageBandData();
-	ImageBandData( GDALDataset *gdalData, unsigned short int *oneDataLine, TopOfAtmosphere *toa );
+	ImageBandData( GDALDataset *gdalData, INPUT_SIZE *oneDataLine, TopOfAtmosphere *toa );
 	~ImageBandData();
-	void Cleanup();
 	void SetGDALData( GDALDataset *gdalData );
-	void SetOneDataLine( unsigned short int *oneDataLine ) { m_OneDataLine = oneDataLine; };
+	void SetOneDataLine( INPUT_SIZE *oneDataLine ) { m_OneDataLine = oneDataLine; };
 	void SetTOA( TopOfAtmosphere *toa ) { m_toa = toa; };
 	bool RetrieveOneDataLine( int lineNumber, int startCol, int numCols );
 	double TOACorrectOnePixel( int pixelNumber );
 
 	GDALDataset *m_GdalData;
 	GDALRasterBand *m_GdalBand;
-	unsigned short int *m_OneDataLine;
+	INPUT_SIZE *m_OneDataLine;
 	TopOfAtmosphere *m_toa;
 };
 
@@ -121,7 +121,8 @@ typedef std::map< int, ImageBandData * > ImageBandMap;
 
 class LANDSATLOOK_EXPORT LandsatLook {
 public:
-	LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot );
+	LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot,
+		double &ULBoundsX, double &ULBoundsY, double &LRBoundsX, double &LRBoundsY );
 	void InitGDAL() const;
 	GDALDataset* OpenLandsatBand( std::string &landsatBandFileRoot, int bandNumber ) const;
 	bool ComputeFarmCellBounds( const MTLParse *config, double &ULX, double &ULY, double &LRX, double &LRY, int &startCol, int &startRow, int &cols, int &rows ) const;
@@ -138,6 +139,10 @@ public:
 	int m_ULCellY;
 	int m_LRCellX;
 	int m_LRCellY;
+	double m_ULBoundsX;
+	double m_ULBoundsY;
+	double m_LRBoundsX;
+	double m_LRBoundsY;
 
 };
 

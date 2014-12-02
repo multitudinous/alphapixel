@@ -17,7 +17,7 @@ MTLParse::MTLParse(  std::string &MTLName ) :
 	if ( m_Config )
 	{
 		// Debug testing
-		std::cout << "Testing MTL parsing routine." << std::endl;
+		std::cout << "Testing MTL parsing." << std::endl;
 		bool exists = m_Config->keyExists("REFLECTANCE_MAXIMUM_BAND_1");
 		std::cout << "REFLECTANCE_MAXIMUM_BAND_1: " << std::boolalpha << exists << "\n";
 		exists = m_Config->keyExists("REFLECTANCE_MINIMUM_BAND_1");
@@ -141,25 +141,42 @@ double TopOfAtmosphere::ComputeTOAReflectance( double uncorrectedNumber )
 	return toaReflectance;
 }
 
-void NormalizedIndex::SetBandNumbers( std::map< int, double > &bands, const int *requiredBands )
+NormalizedIndex::NormalizedIndex( std::map< int, double > &bands, int *reqBands )
 {
 
-	for ( int reqBand = 0; requiredBands[ reqBand ] > 0; ++reqBand )
+	for ( int reqBand = 0; reqBands[ reqBand ] > 0; ++reqBand )
 	{
 		bool found = false;
 		for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
 		{
-			if ( it->first == requiredBands[ reqBand ] )
+			if ( it->first == reqBands[ reqBand ] )
 			{
 				found = true;
 			}
 		}
 		if ( ! found )
 		{
-			bands.insert( std::pair< int, double >(requiredBands[ reqBand ], 0.0 ) );
+			bands.insert( std::pair< int, double >( reqBands[ reqBand ], 0.0 ) );
 		}
+		m_reqBands.push_back( reqBands[ reqBand ] );
 	}
 
+}
+
+double NormalizedIndex::ComputeIndex( std::map< int, double > &bands )
+{
+	std::map< int, double >::iterator it1, it2;
+
+	int firstBand = m_reqBands[0];
+	int secondBand = m_reqBands[1];
+
+	it1 = bands.find( firstBand );
+	it2 = bands.find( secondBand );
+	if ( it1 != bands.end() && it2 != bands.end() )
+	{
+		return ComputeIndex( it1->second, it2->second );
+	}
+	return 0.0;
 }
 
 double NormalizedIndex::ComputeIndex( double reflectance1, double reflectance2 )
@@ -167,73 +184,26 @@ double NormalizedIndex::ComputeIndex( double reflectance1, double reflectance2 )
 	return ( ( reflectance1 - reflectance2 ) / ( reflectance1 + reflectance2 ) );
 }
 
-NDVI::NDVI( std::map< int, double > &bands )
-{
-	SetBandNumbers( bands );
-}
+int NDVIBands[] = { 4, 3, 0 };
 
-void NDVI::SetBandNumbers( std::map< int, double > &bands )
+NDVI::NDVI( std::map< int, double > &bands ) :
+	NormalizedIndex( bands, NDVIBands )
 {
 	// near infrared and visible red
 	// ( NIR - VR ) / ( NIR + VR )
 	// ( TM4 - TM3 ) / ( TM4 + TM3 )
-	const int requiredBands[] = { 3, 4, 0 };
-
-	NormalizedIndex::SetBandNumbers( bands, requiredBands );
 }
 
-double NDVI::ComputeIndex( std::map< int, double > &bands )
-{
-	std::map< int, double >::iterator it1, it2;
+int NDTIBands[] = { 5, 7, 0 };
 
-	// near infrared and visible red
-	// ( NIR - VR ) / ( NIR + VR )
-	// ( TM4 - TM3 ) / ( TM4 + TM3 )
-	int firstBand = 4;
-	int secondBand = 3;
-
-	it1 = bands.find( firstBand );
-	it2 = bands.find( secondBand );
-	if ( it1 != bands.end() && it2 != bands.end() )
-	{
-		return NormalizedIndex::ComputeIndex( it1->second, it2->second );
-	}
-	return 0.0;
-}
-
-NDTI::NDTI( std::map< int, double > &bands )
-{
-	SetBandNumbers( bands );
-}
-
-void NDTI::SetBandNumbers( std::map< int, double > &bands )
+NDTI::NDTI( std::map< int, double > &bands ) :
+NormalizedIndex( bands, NDTIBands )
 {
 	// thematic mapper bands 5 and 7
 	// ( TM5 - TM7 ) / ( TM5 + TM7 )
-	const int requiredBands[] = { 5, 7, 0 };
-
-	NormalizedIndex::SetBandNumbers( bands, requiredBands );
 }
 
-double NDTI::ComputeIndex( std::map< int, double > &bands )
-{
-	std::map< int, double >::iterator it1, it2;
-
-	// thematic mapper bands 5 and 7
-	// ( TM5 - TM7 ) / ( TM5 + TM7 )
-	int firstBand = 5;
-	int secondBand = 7;
-
-	it1 = bands.find( firstBand );
-	it2 = bands.find( secondBand );
-	if ( it1 != bands.end() && it2 != bands.end() )
-	{
-		return NormalizedIndex::ComputeIndex( it1->second, it2->second );
-	}
-	return 0.0;
-}
-
-ImageBandData::ImageBandData( GDALDataset *gdalData, unsigned short int *oneDataLine, TopOfAtmosphere *toa ) :
+ImageBandData::ImageBandData( GDALDataset *gdalData, INPUT_SIZE *oneDataLine, TopOfAtmosphere *toa ) :
 	m_GdalData( gdalData ), 
 	m_GdalBand( 0 ),
 	m_OneDataLine( oneDataLine ),
@@ -255,26 +225,17 @@ ImageBandData::ImageBandData( ) :
 
 ImageBandData::~ImageBandData( )
 {
-	GDALClose ( (GDALDatasetH)m_GdalData );
-	delete m_toa;
-	if ( m_OneDataLine )
+	if ( m_GdalData )
 	{
-		// Causes crashing!!??
-		//CPLFree( m_OneDataLine );
+		GDALClose ( (GDALDatasetH)m_GdalData );
 	}
-}
-
-void ImageBandData::Cleanup()
-{
-	GDALClose ( (GDALDatasetH)m_GdalData );
-	m_GdalData = NULL;
-	m_GdalBand = NULL;
-	delete m_toa;
-	m_toa = NULL;
+	if ( m_toa )
+	{
+		delete m_toa;
+	}
 	if ( m_OneDataLine )
 	{
-		//CPLFree( m_OneDataLine );
-		//m_OneDataLine = NULL;
+		CPLFree( m_OneDataLine );
 	}
 }
 
@@ -294,7 +255,7 @@ bool ImageBandData::RetrieveOneDataLine( int lineNumber, int startCol, int numCo
 	const char*errorMsg;
 	if ( m_GdalBand )
 	{
-		cplErr = m_GdalBand->RasterIO( GF_Read, startCol, lineNumber, numCols, 1, m_OneDataLine, numCols, 1, GDT_UInt32, 0, 0 );
+		cplErr = m_GdalBand->RasterIO( GF_Read, startCol, lineNumber, numCols, 1, m_OneDataLine, numCols, 1, INPUT_RASTER_TYPE, 0, 0 );
 		if ( cplErr == CE_Failure )
 		{
 			errorMsg = CPLGetLastErrorMsg();
@@ -311,7 +272,8 @@ double ImageBandData::TOACorrectOnePixel( int pixelNumber )
 	return m_toa->ComputeTOAReflectance( static_cast< double >( m_OneDataLine[ pixelNumber ] ) );
 }
 
-LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot ) :
+LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot,
+	double &ULBoundsX, double &ULBoundsY, double &LRBoundsX, double &LRBoundsY ) :
 	m_exportNDVI( exportNDVI ),
 	m_exportNDTI( exportNDTI ),
 	m_landsatPath( landsatPath ),
@@ -319,10 +281,32 @@ LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsat
 	m_ULCellX( 0 ),
 	m_ULCellY( 0 ),
 	m_LRCellX( 0 ),
-	m_LRCellY( 0 )
+	m_LRCellY( 0 ),
+	m_ULBoundsX( ULBoundsX ),
+	m_ULBoundsY( ULBoundsY ),
+	m_LRBoundsX( LRBoundsX ),
+	m_LRBoundsY( LRBoundsY )
 
 {
 	InitGDAL();
+
+	if ( m_exportNDVI && m_exportNDTI )
+	{
+		std::cout << "Operation Landsat Look begun. Outputs will be NDVI and NDTI.\n" << std::endl;
+	}
+	else if ( m_exportNDVI )
+	{
+		std::cout << "Operation Landsat Look begun. Output will be NDVI only.\n" << std::endl;
+	}
+	else if ( m_exportNDTI )
+	{
+		std::cout << "Operation Landsat Look begun. Output will be NDTI only.\n" << std::endl;
+	}
+	else
+	{
+		std::cout << "Operation Landsat Look begun. No outputs were specified for generation.\n" << std::endl;
+	}
+
 }
 
 void LandsatLook::InitGDAL() const
@@ -356,11 +340,14 @@ bool LandsatLook::ComputeFarmCellBounds( const MTLParse *config, double &ULX, do
     // CORNER_LR_PROJECTION_Y_PRODUCT
 	// REFLECTIVE_LINES
 	// REFLECTIVE_SAMPLES
+	// GRID_CELL_SIZE_REFLECTIVE
 
 	std::string key;
 	double keyVal;
 	int intKey;
 
+	// Landsat corners are cell centers and need to be adjusted by half cell width for
+	// correct bounds interpretation.
 	key = "GRID_CELL_SIZE_REFLECTIVE";
 	if ( config->FindKey( key, keyVal ) )
 	{
@@ -411,6 +398,12 @@ bool LandsatLook::ComputeFarmCellBounds( const MTLParse *config, double &ULX, do
 	rows = endRow - startRow;
 	cols = endCol - startCol;
 
+	std::cout << "Requested area begins at column " << startCol << std::endl;
+	std::cout << "   and ends at column " << endCol << std::endl;
+	std::cout << "Requested area begins at row " << startRow << std::endl;
+	std::cout << "   and ends at row " << endRow << std::endl;
+	std::cout << "For an output grid size of " << cols << " columns by " << rows << " rows.\n" << std::endl;
+
 	if ( startRow >= 0 && endRow < imageRows && startCol >= 0 && endCol < imageCols )
 	{
 		return true;
@@ -439,11 +432,13 @@ void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, ImageBandMap
 		destTransformFactors[4] = srcTransformFactors[4];
 		destTransformFactors[5] = srcTransformFactors[5];
 
+		std::cout << "GDAL raster transform factors for output region:" << std::endl;
 		for ( int ct = 0; ct < 6; ++ct )
 		{
 			std::cout << "Transform[" << ct << "] = " << destTransformFactors[ct] << std::endl;
 
 		}
+		std::cout << std::endl;
 		// Set the geotransform
 		CPLErr cplErr = targetDataset->SetGeoTransform( destTransformFactors );
 		if ( cplErr == CE_Failure )
@@ -458,7 +453,8 @@ void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, ImageBandMap
 
 #define OUTPUT_SIZE float
 #define OUTPUT_RASTER_TYPE GDT_Float32
-//#define SEPARATE_OUTPUTS
+// Undefine SEPARATE_OUTPUTS to override user's preferences and export both NDTI and NDVI
+#define SEPARATE_OUTPUTS
 
 bool LandsatLook::Operate()
 {
@@ -483,7 +479,9 @@ bool LandsatLook::Operate()
 			success = ExportNDTI( parse );
 		}
 #else
-		
+		// This section will output both NDVI and NDTI regardless of the caller's preference.
+		// This code could be modified to handle either or both outputs a little more 
+		// efficiently than doing each one separately though the code will be messy.
 		// One list of all the bands required for both calculated indices.
 		std::map< int, double > bands;
 		NDVI ndvi( bands );
@@ -495,14 +493,8 @@ bool LandsatLook::Operate()
 		ImageBandMap imageBands;
 
 		// Crop to farm boundary in UTM coords
-		// NW: UTM ( WGS84 ) - ( 476012.685, 4658427.925 )
-		// SE: UTM ( WGS84 ) - ( 477569.273, 4656871.337 )
-		double ULX = 476012.685;
-		double ULY = 4658427.925;
-		double LRX = 477569.273;
-		double LRY = 4656871.337;
 		int startCol, startRow, cols, rows;
-		success = ComputeFarmCellBounds( parse, ULX, ULY, LRX, LRY, startCol, startRow, cols, rows );
+		success = ComputeFarmCellBounds( parse, m_ULBoundsX, m_ULBoundsY, m_LRBoundsX, m_LRBoundsY, startCol, startRow, cols, rows );
 		if ( success )
 		{
 			for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
@@ -514,7 +506,7 @@ bool LandsatLook::Operate()
 					GDALDataset *bandRaster = OpenLandsatBand( rootImageName, bandNumber );
 					if ( bandRaster )
 					{
-						unsigned short int *bData = ( unsigned short int * )CPLMalloc( sizeof( unsigned short int ) * cols );
+						INPUT_SIZE *bData = ( INPUT_SIZE * )CPLMalloc( sizeof( INPUT_SIZE ) * cols );
 						if ( bData )
 						{
 							ImageBandData *ibd = new ImageBandData( bandRaster, bData, toa );
@@ -664,8 +656,8 @@ bool LandsatLook::Operate()
 					}
 				}
 				// CPLFree() is broken and crashes. -Gary Huber
-				//CPLFree( computedNDVI );
-				//CPLFree( computedNDTI );
+				CPLFree( computedNDVI );
+				CPLFree( computedNDTI );
 			}
 			if ( success )
 			{
@@ -676,15 +668,13 @@ bool LandsatLook::Operate()
 			}
 
 		}
-#endif
-		// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
-		/*
 		for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
 		{
 			ImageBandData *bandData = it->second;
-			bandData->Cleanup();
+			delete bandData;
+			it->second = NULL;
 		}
-		*/
+#endif
 		delete parse;
 	}
 	else
@@ -692,6 +682,14 @@ bool LandsatLook::Operate()
 		success = false;
 	}
 
+	if ( success )
+	{
+		std::cout << "Operation Landsat Look completed successfully." << std::endl;
+	}
+	else
+	{
+		std::cout << "Operation Landsat Look failed to complete successfully." << std::endl;
+	}
 	return success;
 }
 
@@ -701,6 +699,7 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 	std::string baseFile = m_landsatPath;
 	baseFile += m_landsatFileRoot;
 
+	std::cout << "Computation of NDVI begun.\n" << std::endl;
 	// One list of all the bands required for both calculated indices.
 	std::map< int, double > bands;
 	NDVI ndvi( bands );
@@ -710,15 +709,12 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 	rootImageName += "B";
 	ImageBandMap imageBands;
 
+	OUTPUT_SIZE maxValue = std::numeric_limits< OUTPUT_SIZE >::min();
+	OUTPUT_SIZE minValue = std::numeric_limits< OUTPUT_SIZE >::max();
+
 	// Crop to farm boundary in UTM coords
-	// NW: UTM ( WGS84 ) - ( 476012.685, 4658427.925 )
-	// SE: UTM ( WGS84 ) - ( 477569.273, 4656871.337 )
-	double ULX = 476012.685;
-	double ULY = 4658427.925;
-	double LRX = 477569.273;
-	double LRY = 4656871.337;
 	int startCol, startRow, cols, rows;
-	success = ComputeFarmCellBounds( parse, ULX, ULY, LRX, LRY, startCol, startRow, cols, rows );
+	success = ComputeFarmCellBounds( parse, m_ULBoundsX, m_ULBoundsY, m_LRBoundsX, m_LRBoundsY, startCol, startRow, cols, rows );
 	if ( success )
 	{
 		for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
@@ -730,7 +726,7 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 				GDALDataset *bandRaster = OpenLandsatBand( rootImageName, bandNumber );
 				if ( bandRaster )
 				{
-					unsigned short int *bData = ( unsigned short int * )CPLMalloc( sizeof( unsigned short int ) * cols );
+					INPUT_SIZE *bData = ( INPUT_SIZE * )CPLMalloc( sizeof( INPUT_SIZE ) * cols );
 					if ( bData )
 					{
 						ImageBandData *ibd = new ImageBandData( bandRaster, bData, toa );
@@ -839,6 +835,14 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 					// Feed the pixel's digital numbers into the calculators for NDVI
 					// Store the calculated NDVI values in its own one line buffer
 					computedNDVI[ col ] = static_cast< OUTPUT_SIZE >( ndvi.ComputeIndex( bands ) );
+					if ( computedNDVI[ col ] > maxValue )
+					{
+						maxValue = computedNDVI[ col ];
+					}
+					if ( computedNDVI[ col ] < minValue )
+					{
+						minValue = computedNDVI[ col ];
+					}
 				}
 				// Write a line of data at a time into output rasters
 				CPLErr cplErr = ndviBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDVI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
@@ -850,8 +854,7 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 					break;
 				}
 			}
-			// CPLFree() is broken and crashes. -Gary Huber
-			//CPLFree( computedNDVI );
+			CPLFree( computedNDVI );
 		}
 		if ( success )
 		{
@@ -864,15 +867,22 @@ bool LandsatLook::ExportNDVI( MTLParse *parse )
 
 	}
 
-	// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
-	/*
 	for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
 	{
 		ImageBandData *bandData = it->second;
-		bandData->Cleanup();
+		delete bandData;
+		it->second = NULL;
 	}
-	*/
 
+	if ( success )
+	{
+		std::cout << "Computation of NDVI finished successfully.\n" << std::endl;
+		std::cout << "The range of NDVI values found was " << minValue << " to " << maxValue << std::endl << std::endl;
+	}
+	else
+	{
+		std::cout << "Computation of NDVI unsuccessful.\n" << std::endl;
+	}
 	return success;
 }
 
@@ -882,6 +892,7 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 	std::string baseFile = m_landsatPath;
 	baseFile += m_landsatFileRoot;
 
+	std::cout << "Computation of NDTI begun.\n" << std::endl;
 	// One list of all the bands required for both calculated indices.
 	std::map< int, double > bands;
 	NDTI ndti( bands );
@@ -891,15 +902,12 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 	rootImageName += "B";
 	ImageBandMap imageBands;
 
+	OUTPUT_SIZE maxValue = std::numeric_limits< OUTPUT_SIZE >::min();
+	OUTPUT_SIZE minValue = std::numeric_limits< OUTPUT_SIZE >::max();
+
 	// Crop to farm boundary in UTM coords
-	// NW: UTM ( WGS84 ) - ( 476012.685, 4658427.925 )
-	// SE: UTM ( WGS84 ) - ( 477569.273, 4656871.337 )
-	double ULX = 476012.685;
-	double ULY = 4658427.925;
-	double LRX = 477569.273;
-	double LRY = 4656871.337;
 	int startCol, startRow, cols, rows;
-	success = ComputeFarmCellBounds( parse, ULX, ULY, LRX, LRY, startCol, startRow, cols, rows );
+	success = ComputeFarmCellBounds( parse, m_ULBoundsX, m_ULBoundsY, m_LRBoundsX, m_LRBoundsY, startCol, startRow, cols, rows );
 	if ( success )
 	{
 		for ( std::map< int, double >::iterator it = bands.begin(); it != bands.end(); ++it )
@@ -911,7 +919,7 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 				GDALDataset *bandRaster = OpenLandsatBand( rootImageName, bandNumber );
 				if ( bandRaster )
 				{
-					unsigned short int *bData = ( unsigned short int * )CPLMalloc( sizeof( unsigned short int ) * cols );
+					INPUT_SIZE *bData = ( INPUT_SIZE * )CPLMalloc( sizeof( INPUT_SIZE ) * cols );
 					if ( bData )
 					{
 						ImageBandData *ibd = new ImageBandData( bandRaster, bData, toa );
@@ -1020,6 +1028,14 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 					// Feed the pixel's digital numbers into the calculators for NDTI
 					// Store the calculated NDTI values in its own one line buffer
 					computedNDTI[ col ] = static_cast< OUTPUT_SIZE >( ndti.ComputeIndex( bands ) );
+					if ( computedNDTI[ col ] > maxValue )
+					{
+						maxValue = computedNDTI[ col ];
+					}
+					if ( computedNDTI[ col ] < minValue )
+					{
+						minValue = computedNDTI[ col ];
+					}
 				}
 				// Write a line of data at a time into output rasters
 				CPLErr cplErr = ndtiBand->RasterIO( GF_Write, 0, row, cols, 1, computedNDTI, cols, 1, OUTPUT_RASTER_TYPE, 0, 0 );
@@ -1031,8 +1047,7 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 					break;
 				}
 			}
-			// CPLFree() is broken and crashes. -Gary Huber
-			//CPLFree( computedNDTI );
+			CPLFree( computedNDTI );
 		}
 		if ( success )
 		{
@@ -1045,15 +1060,22 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 
 	}
 
-	// Crashes if deleting the ImageBandData member or the members within it. CPLFree again?
-	/*
 	for ( ImageBandMap::iterator it = imageBands.begin(); it != imageBands.end(); ++it )
 	{
 		ImageBandData *bandData = it->second;
-		bandData->Cleanup();
+		delete bandData;
+		it->second = NULL;
 	}
-	*/
 
+	if ( success )
+	{
+		std::cout << "Computation of NDTI finished successfully." << std::endl;
+		std::cout << "The range of NDTI values found was " << minValue << " to " << maxValue << std::endl << std::endl;
+	}
+	else
+	{
+		std::cout << "Computation of NDTI unsuccessful.\n" << std::endl;
+	}
 	return success;
 }
 
