@@ -7,7 +7,7 @@
 
 namespace landsatlook {
 
-MTLParse::MTLParse(  std::string &MTLName ) :
+MTLParse::MTLParse( const std::string &MTLName ) :
 	m_Success(  false ),
 	m_Config( 0 )
 {
@@ -17,11 +17,11 @@ MTLParse::MTLParse(  std::string &MTLName ) :
 	if ( m_Config )
 	{
 		// Debug testing
-		std::cout << "Testing MTL parsing." << std::endl;
-		bool exists = m_Config->keyExists("REFLECTANCE_MAXIMUM_BAND_1");
-		std::cout << "REFLECTANCE_MAXIMUM_BAND_1: " << std::boolalpha << exists << "\n";
-		exists = m_Config->keyExists("REFLECTANCE_MINIMUM_BAND_1");
-		std::cout << "REFLECTANCE_MINIMUM_BAND_1: " << exists << "\n";
+		std::cout << "Testing MTL parsing by finding reading some values." << std::endl;
+		bool exists1 = m_Config->keyExists("REFLECTANCE_MAXIMUM_BAND_1");
+		std::cout << "REFLECTANCE_MAXIMUM_BAND_1: " << std::boolalpha << exists1 << "\n";
+		bool exists2 = m_Config->keyExists("REFLECTANCE_MINIMUM_BAND_1");
+		std::cout << "REFLECTANCE_MINIMUM_BAND_1: " << exists2 << "\n";
 
 		std::string stringVal = m_Config->getValueOfKey<std::string>("REFLECTANCE_MAXIMUM_BAND_1");
 		std::cout << "value of REFLECTANCE_MAXIMUM_BAND_1 string: " << stringVal << "\n";
@@ -33,7 +33,7 @@ MTLParse::MTLParse(  std::string &MTLName ) :
 		doubleVal = m_Config->getValueOfKey<double>("REFLECTANCE_MINIMUM_BAND_1");
 		std::cout << "value of REFLECTANCE_MINIMUM_BAND_1 double: " << doubleVal << "\n\n";
 
-		m_Success = exists;
+		m_Success = exists1 && exists2;
 	}
 }
 
@@ -45,7 +45,7 @@ MTLParse::~MTLParse()
 	}
 }
 
-bool MTLParse::FindKey( std::string &key, double &keyVal ) const
+bool MTLParse::FindKey( const std::string &key, double &keyVal ) const
 {
 		if ( m_Success && m_Config->keyExists( key ) )
 		{
@@ -55,7 +55,7 @@ bool MTLParse::FindKey( std::string &key, double &keyVal ) const
 		return false;
 }
 
-bool MTLParse::FindKey( std::string &key, int &keyVal ) const
+bool MTLParse::FindKey( const std::string &key, int &keyVal ) const
 {
 		if ( m_Success && m_Config->keyExists( key ) )
 		{
@@ -64,8 +64,6 @@ bool MTLParse::FindKey( std::string &key, int &keyVal ) const
 		}
 		return false;
 }
-
-#define DegToRad ( 3.14159265 / 180.0 )
 
 TopOfAtmosphere::TopOfAtmosphere( const MTLParse *config, int band ) :
 	MetaDataOwner( band ),
@@ -113,7 +111,7 @@ TopOfAtmosphere::TopOfAtmosphere( const MTLParse *config, int band ) :
 
 }
 
-double TopOfAtmosphere::ComputeTOAReflectance( double uncorrectedNumber )
+double TopOfAtmosphere::ComputeTOAReflectance( double uncorrectedNumber ) const
 {
 	double toaReflectance;
 
@@ -141,7 +139,7 @@ double TopOfAtmosphere::ComputeTOAReflectance( double uncorrectedNumber )
 	return toaReflectance;
 }
 
-NormalizedIndex::NormalizedIndex( std::map< int, double > &bands, int *reqBands )
+NormalizedIndex::NormalizedIndex( std::map< int, double > &bands, const int *reqBands )
 {
 
 	for ( int reqBand = 0; reqBands[ reqBand ] > 0; ++reqBand )
@@ -163,9 +161,9 @@ NormalizedIndex::NormalizedIndex( std::map< int, double > &bands, int *reqBands 
 
 }
 
-double NormalizedIndex::ComputeIndex( std::map< int, double > &bands )
+double NormalizedIndex::ComputeIndex( const std::map< int, double > &bands ) const
 {
-	std::map< int, double >::iterator it1, it2;
+	std::map< int, double >::const_iterator it1, it2;
 
 	int firstBand = m_reqBands[0];
 	int secondBand = m_reqBands[1];
@@ -179,7 +177,7 @@ double NormalizedIndex::ComputeIndex( std::map< int, double > &bands )
 	return 0.0;
 }
 
-double NormalizedIndex::ComputeIndex( double reflectance1, double reflectance2 )
+double NormalizedIndex::ComputeIndex( double reflectance1, double reflectance2 ) const
 {
 	return ( ( reflectance1 - reflectance2 ) / ( reflectance1 + reflectance2 ) );
 }
@@ -272,8 +270,8 @@ double ImageBandData::TOACorrectOnePixel( int pixelNumber )
 	return m_toa->ComputeTOAReflectance( static_cast< double >( m_OneDataLine[ pixelNumber ] ) );
 }
 
-LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, std::string &landsatPath, std::string &landsatFileRoot,
-	double &ULBoundsX, double &ULBoundsY, double &LRBoundsX, double &LRBoundsY ) :
+LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, const std::string &landsatPath, const std::string &landsatFileRoot,
+	const double &ULBoundsX, const double &ULBoundsY, const double &LRBoundsX, const double &LRBoundsY ) :
 	m_exportNDVI( exportNDVI ),
 	m_exportNDTI( exportNDTI ),
 	m_landsatPath( landsatPath ),
@@ -314,7 +312,7 @@ void LandsatLook::InitGDAL() const
 	GDALAllRegister();
 }
 
-GDALDataset* LandsatLook::OpenLandsatBand( std::string &landsatBandFileRoot, int bandNumber ) const
+GDALDataset* LandsatLook::OpenLandsatBand( const std::string &landsatBandFileRoot, int bandNumber ) const
 {
 	GDALDataset* bandDataset = NULL;
 	char bandChar[12];
@@ -412,10 +410,10 @@ bool LandsatLook::ComputeFarmCellBounds( const MTLParse *config, double &ULX, do
 
 }
 
-void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, ImageBandMap &imageBands, int startCol, int startRow ) const
+void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, const ImageBandMap &imageBands, int startCol, int startRow ) const
 {
 
-	ImageBandMap::iterator it = imageBands.begin();
+	ImageBandMap::const_iterator it = imageBands.begin();
 	if ( it != imageBands.end() )
 	{
 		double srcTransformFactors[6];

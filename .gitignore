@@ -1,0 +1,41 @@
+*.TIF
+*.vcxproj
+*.filters
+*.user
+LandsatLook/CMakeCache.txt
+*.cmake
+*.bin
+*.c
+*.exe
+*.tlog
+*.obj
+*.manifest
+*.lastbuildstate
+*.cache
+LandsatLook/CMakeFiles/3.1.0-rc2/CompilerIdCXX/CMakeCXXCompilerId.cpp
+LandsatLook/CMakeFiles/92e21b8d4012680c82db614b543f6c2c/generate.stamp.rule
+LandsatLook/CMakeFiles/cmake.check_cache
+*.log
+*.stamp
+*.depend
+*.list
+LandsatLook/CMakeFiles/TargetDirectories.txt
+LandsatLook/Data/LC80260312014079LGN00_MTL.txt
+*.dll
+*.exp
+*.ilk
+*.lib
+*.pdb
+*.ipch
+*.res
+*.rc
+*.opensdf
+*.sdf
+*.sln
+*.suo
+PrototypesFor Gary/RUSLE2.cpp
+PrototypesFor Gary/RUSLE2.h
+PrototypesFor Gary/test.cpp
+LandsatLook/LandsatLook.dir/Debug/LandsatLook.unsuccessfulbuild
+LandsatLook/Data/LC80250302014232LGN00_MTL.txt
+LandsatLook/Data/LC80260312014191LGN00_MTL.txt
