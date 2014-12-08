@@ -39,6 +39,6 @@ int main(int argc, char** argv) {
 
 	bool success = sc.Operate();
 
-	return landsatlook::function();
+	return 0;
 }
 

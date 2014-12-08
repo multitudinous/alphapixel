@@ -9,9 +9,9 @@ namespace landsatlook {
 
 MTLParse::MTLParse( const std::string &MTLName ) :
 	m_Success(  false ),
-	m_Config( 0 )
+	m_Config( 0 ),
+	m_MTLName( MTLName )
 {
-	m_MTLName = MTLName;
 
 	m_Config = new ConfigFile( m_MTLName.c_str() );
 	if ( m_Config )
@@ -305,148 +305,6 @@ LandsatLook::LandsatLook( bool exportNDVI, bool exportNDTI, const std::string &l
 		std::cout << "Operation Landsat Look begun. No outputs were specified for generation.\n" << std::endl;
 	}
 
-}
-
-void LandsatLook::InitGDAL() const
-{
-	GDALAllRegister();
-}
-
-GDALDataset* LandsatLook::OpenLandsatBand( const std::string &landsatBandFileRoot, int bandNumber ) const
-{
-	GDALDataset* bandDataset = NULL;
-	char bandChar[12];
-
-	sprintf_s( bandChar, "%d", bandNumber );
-	std::string filename = landsatBandFileRoot;
-	filename += bandChar;
-	filename += ".TIF";
-	bandDataset = (GDALDataset *) GDALOpen( filename.c_str(), GA_ReadOnly );
-	return bandDataset;
-}
-
-bool LandsatLook::ComputeFarmCellBounds( const MTLParse *config, double &ULX, double &ULY, double &LRX, double &LRY, int &startCol, int &startRow, int &cols, int &rows ) const
-{
-	// Fetch bounds of images from meta data
-	double imageULX, imageULY, imageLRX, imageLRY, cellSize;
-	int imageRows, imageCols;
-
-	// Keys for image bounds in UTM
-    // CORNER_UL_PROJECTION_X_PRODUCT
-    // CORNER_UL_PROJECTION_Y_PRODUCT
-    // CORNER_LR_PROJECTION_X_PRODUCT
-    // CORNER_LR_PROJECTION_Y_PRODUCT
-	// REFLECTIVE_LINES
-	// REFLECTIVE_SAMPLES
-	// GRID_CELL_SIZE_REFLECTIVE
-
-	std::string key;
-	double keyVal;
-	int intKey;
-
-	// Landsat corners are cell centers and need to be adjusted by half cell width for
-	// correct bounds interpretation.
-	key = "GRID_CELL_SIZE_REFLECTIVE";
-	if ( config->FindKey( key, keyVal ) )
-	{
-		cellSize = keyVal;
-	}
-	key = "CORNER_UL_PROJECTION_X_PRODUCT";
-	if ( config->FindKey( key, keyVal ) )
-	{
-		imageULX = keyVal - cellSize * .5;
-	}
-	key = "CORNER_UL_PROJECTION_Y_PRODUCT";
-	if ( config->FindKey( key, keyVal ) )
-	{
-		imageULY = keyVal + cellSize * .5;
-	}
-	key = "CORNER_LR_PROJECTION_X_PRODUCT";
-	if ( config->FindKey( key, keyVal ) )
-	{
-		imageLRX = keyVal + cellSize * .5;
-	}
-	key = "CORNER_LR_PROJECTION_Y_PRODUCT";
-	if ( config->FindKey( key, keyVal ) )
-	{
-		imageLRY = keyVal - cellSize * .5;
-	}
-	key = "REFLECTIVE_LINES";
-	if ( config->FindKey( key, intKey ) )
-	{
-		imageRows = intKey;
-	}
-	key = "REFLECTIVE_SAMPLES";
-	if ( config->FindKey( key, intKey ) )
-	{
-		imageCols = intKey;
-	}
-
-	ULX = ULX > imageULX ? ULX: imageULX;
-	LRX = LRX < imageLRX ? LRX: imageLRX;
-	ULY = ULY < imageULY ? ULY: imageULY;
-	LRY = LRY > imageLRY ? LRY: imageLRY;
-
-	int endRow, endCol;
-
-	startRow = static_cast< int >( floor( ( imageULY - ULY ) / cellSize ) );
-	startCol = static_cast< int >( floor( ( ULX - imageULX ) / cellSize ) );
-	endRow = static_cast< int >( ceil( ( imageULY - LRY ) / cellSize ) );
-	endCol = static_cast< int >( ceil( ( LRX - imageULX ) / cellSize ) );
-	rows = endRow - startRow;
-	cols = endCol - startCol;
-
-	std::cout << "Requested area begins at column " << startCol << std::endl;
-	std::cout << "   and ends at column " << endCol << std::endl;
-	std::cout << "Requested area begins at row " << startRow << std::endl;
-	std::cout << "   and ends at row " << endRow << std::endl;
-	std::cout << "For an output grid size of " << cols << " columns by " << rows << " rows.\n" << std::endl;
-
-	if ( startRow >= 0 && endRow < imageRows && startCol >= 0 && endCol < imageCols )
-	{
-		return true;
-	}
-	return false;
-
-}
-
-void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, const ImageBandMap &imageBands, int startCol, int startRow ) const
-{
-
-	ImageBandMap::const_iterator it = imageBands.begin();
-	if ( it != imageBands.end() )
-	{
-		double srcTransformFactors[6];
-		double destTransformFactors[6];
-
-		GDALDataset *srcDataset = it->second->m_GdalData;
-		srcDataset->GetGeoTransform( srcTransformFactors );
-
-		// Coords of cropped region
-		destTransformFactors[0] = srcTransformFactors[0] + startCol * srcTransformFactors[1];
-		destTransformFactors[1] = srcTransformFactors[1];
-		destTransformFactors[2] = srcTransformFactors[2];
-		destTransformFactors[3] = srcTransformFactors[3] + startRow * srcTransformFactors[5];
-		destTransformFactors[4] = srcTransformFactors[4];
-		destTransformFactors[5] = srcTransformFactors[5];
-
-		std::cout << "GDAL raster transform factors for output region:" << std::endl;
-		for ( int ct = 0; ct < 6; ++ct )
-		{
-			std::cout << "Transform[" << ct << "] = " << destTransformFactors[ct] << std::endl;
-
-		}
-		std::cout << std::endl;
-		// Set the geotransform
-		CPLErr cplErr = targetDataset->SetGeoTransform( destTransformFactors );
-		if ( cplErr == CE_Failure )
-		{
-			std::cout << "Error setting GeoTransform on output raster." << std::endl;
-		}
-
-		const char *projRefWkt = srcDataset->GetProjectionRef();
-		targetDataset->SetProjection( projRefWkt );
-	}
 }
 
 #define OUTPUT_SIZE float
@@ -1077,10 +935,149 @@ bool LandsatLook::ExportNDTI( MTLParse *parse )
 	return success;
 }
 
-int function()
+
+void LandsatLook::InitGDAL() const
 {
-	return 22;
+	GDALAllRegister();
 }
+
+GDALDataset* LandsatLook::OpenLandsatBand( const std::string &landsatBandFileRoot, int bandNumber ) const
+{
+	GDALDataset* bandDataset = NULL;
+	char bandChar[12];
+
+	sprintf_s( bandChar, "%d", bandNumber );
+	std::string filename = landsatBandFileRoot;
+	filename += bandChar;
+	filename += ".TIF";
+	bandDataset = (GDALDataset *) GDALOpen( filename.c_str(), GA_ReadOnly );
+	return bandDataset;
+}
+
+bool LandsatLook::ComputeFarmCellBounds( const MTLParse *config, double &ULX, double &ULY, double &LRX, double &LRY, int &startCol, int &startRow, int &cols, int &rows ) const
+{
+	// Fetch bounds of images from meta data
+	double imageULX, imageULY, imageLRX, imageLRY, cellSize;
+	int imageRows, imageCols;
+
+	// Keys for image bounds in UTM
+    // CORNER_UL_PROJECTION_X_PRODUCT
+    // CORNER_UL_PROJECTION_Y_PRODUCT
+    // CORNER_LR_PROJECTION_X_PRODUCT
+    // CORNER_LR_PROJECTION_Y_PRODUCT
+	// REFLECTIVE_LINES
+	// REFLECTIVE_SAMPLES
+	// GRID_CELL_SIZE_REFLECTIVE
+
+	std::string key;
+	double keyVal;
+	int intKey;
+
+	// Landsat corners are cell centers and need to be adjusted by half cell width for
+	// correct bounds interpretation.
+	key = "GRID_CELL_SIZE_REFLECTIVE";
+	if ( config->FindKey( key, keyVal ) )
+	{
+		cellSize = keyVal;
+	}
+	key = "CORNER_UL_PROJECTION_X_PRODUCT";
+	if ( config->FindKey( key, keyVal ) )
+	{
+		imageULX = keyVal - cellSize * .5;
+	}
+	key = "CORNER_UL_PROJECTION_Y_PRODUCT";
+	if ( config->FindKey( key, keyVal ) )
+	{
+		imageULY = keyVal + cellSize * .5;
+	}
+	key = "CORNER_LR_PROJECTION_X_PRODUCT";
+	if ( config->FindKey( key, keyVal ) )
+	{
+		imageLRX = keyVal + cellSize * .5;
+	}
+	key = "CORNER_LR_PROJECTION_Y_PRODUCT";
+	if ( config->FindKey( key, keyVal ) )
+	{
+		imageLRY = keyVal - cellSize * .5;
+	}
+	key = "REFLECTIVE_LINES";
+	if ( config->FindKey( key, intKey ) )
+	{
+		imageRows = intKey;
+	}
+	key = "REFLECTIVE_SAMPLES";
+	if ( config->FindKey( key, intKey ) )
+	{
+		imageCols = intKey;
+	}
+
+	ULX = ULX > imageULX ? ULX: imageULX;
+	LRX = LRX < imageLRX ? LRX: imageLRX;
+	ULY = ULY < imageULY ? ULY: imageULY;
+	LRY = LRY > imageLRY ? LRY: imageLRY;
+
+	int endRow, endCol;
+
+	startRow = static_cast< int >( floor( ( imageULY - ULY ) / cellSize ) );
+	startCol = static_cast< int >( floor( ( ULX - imageULX ) / cellSize ) );
+	endRow = static_cast< int >( ceil( ( imageULY - LRY ) / cellSize ) );
+	endCol = static_cast< int >( ceil( ( LRX - imageULX ) / cellSize ) );
+	rows = endRow - startRow;
+	cols = endCol - startCol;
+
+	std::cout << "Requested area begins at column " << startCol << std::endl;
+	std::cout << "   and ends at column " << endCol << std::endl;
+	std::cout << "Requested area begins at row " << startRow << std::endl;
+	std::cout << "   and ends at row " << endRow << std::endl;
+	std::cout << "For an output grid size of " << cols << " columns by " << rows << " rows.\n" << std::endl;
+
+	if ( startRow >= 0 && endRow < imageRows && startCol >= 0 && endCol < imageCols )
+	{
+		return true;
+	}
+	return false;
+
+}
+
+void LandsatLook::SetGeoRefFromLandsat( GDALDataset *targetDataset, const ImageBandMap &imageBands, int startCol, int startRow ) const
+{
+
+	ImageBandMap::const_iterator it = imageBands.begin();
+	if ( it != imageBands.end() )
+	{
+		double srcTransformFactors[6];
+		double destTransformFactors[6];
+
+		GDALDataset *srcDataset = it->second->m_GdalData;
+		srcDataset->GetGeoTransform( srcTransformFactors );
+
+		// Coords of cropped region
+		destTransformFactors[0] = srcTransformFactors[0] + startCol * srcTransformFactors[1];
+		destTransformFactors[1] = srcTransformFactors[1];
+		destTransformFactors[2] = srcTransformFactors[2];
+		destTransformFactors[3] = srcTransformFactors[3] + startRow * srcTransformFactors[5];
+		destTransformFactors[4] = srcTransformFactors[4];
+		destTransformFactors[5] = srcTransformFactors[5];
+
+		std::cout << "GDAL raster transform factors for output region:" << std::endl;
+		for ( int ct = 0; ct < 6; ++ct )
+		{
+			std::cout << "Transform[" << ct << "] = " << destTransformFactors[ct] << std::endl;
+
+		}
+		std::cout << std::endl;
+		// Set the geotransform
+		CPLErr cplErr = targetDataset->SetGeoTransform( destTransformFactors );
+		if ( cplErr == CE_Failure )
+		{
+			std::cout << "Error setting GeoTransform on output raster." << std::endl;
+		}
+
+		const char *projRefWkt = srcDataset->GetProjectionRef();
+		targetDataset->SetProjection( projRefWkt );
+	}
+}
+
 
 }
 
