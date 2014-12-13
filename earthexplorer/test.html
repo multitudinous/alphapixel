@@ -1,0 +1,275 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+            <head>
+                <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+                <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+                <title>EarthExplorer</title>        <meta name="description" content="Query and order satellite images, aerial
+                    photographs, and cartographic products through the U.S. Geological Survey" />
+                <meta name="keywords"
+                    content="U.S. Geological Survey,USGS,National Mapping Division,NMD,USA,
+                    United States,Territories,Antarctica,cartographic,cartography,geographic,
+                    geography,geospatial data,geographic information system,GIS,mapping,maps,
+                    aerial photographs,satellite imagery,digital elevation model,
+                    digital raster graphic,digital orthophoto,topographic,topography,
+                    geographic names,earthscience,data,geospatial metadata,geospatial data standards,
+                    landsat,GNIS,NAPP,DEM,DRG,DOQ,NSDI,Earth Explorer, EarthExplorer" />
+                <meta name="author" content="USGS - U.S. Geological Survey" />
+                <meta name="publisher" content="USGS - U.S. Geological Survey" />
+                <meta name="classification" content="Government" />
+                <meta name="robots" content="ALL" />
+                <meta name="distribution" content="Global" />
+                <meta name="rating" content="Safe For Kids" />
+                <meta name="copyright" content="None" />
+                <meta name="language" content="English" />
+                <meta name="doc-type" content="Government" />
+                <meta name="doc-class" content="Living Document" />
+                <meta name="doc-rights" content="Public Domain" />
+                
+                 <link href="/css/custom.css" rel="stylesheet" type="text/css" />
+                 <link href="/css/newhome.css" rel="stylesheet" type="text/css" />
+                 <link href="/css/jquery-ui-1.10.2.custom.min.css" rel="stylesheet" type="text/css" />
+                 <link href="/css/extras.css" rel="stylesheet" type="text/css" />
+                 <link href="/css/dropdownmenu.css" rel="stylesheet" type="text/css" />
+                          
+                          
+                 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+                 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/jquery-ui.min.js" ></script>
+                 <script type="text/javascript" src="/js_include/EE.js"></script>
+                 
+                             
+                 <!--[if lte IE 7]>
+                    <link href="/css/ie.css" rel="stylesheet" type="text/css" />
+                 <![endif]-->
+            </head>
+            <body>
+                <!-- BEGIN USGS Header Template -->
+        <div id="header">
+            <div id="headerLogo">
+                <a href="http://www.usgs.gov/" target="_blank">
+                    <img src="/images/header/header_graphic_usgsIdentifier_white.jpg"
+                        alt="USGS - science for a changing world" title="U.S. Geological Survey Home Page" 
+                        style="width:178px;height:72px;" />
+                </a>
+            </div>
+            
+            <div id="headerGradientLeft"></div>
+            
+            <div id="usgsInfo">
+                <a href="http://www.usgs.gov/" target="_blank">USGS Home</a><br />
+                <a href="http://www.usgs.gov/ask/" target="_blank">Contact USGS</a><br />
+                <a href="http://search.usgs.gov/" target="_blank">Search USGS</a>
+            </div>
+            
+            <div id="headerGradientRight"></div>
+            
+            <div style="clear:both;"></div>
+        </div>
+        <!-- Top Header Bar -->
+                <div id="titleBar">
+                    EarthExplorer        </div>
+        
+        <style type="text/css">
+        
+            #optionsPage {
+                text-align: center;
+                display: block;
+            }
+            
+            #optionsPage a.infoLink, #optionsPage a.infoLink:visited {
+                color: #678ac7;
+                text-decoration: underline;
+            }
+            
+            #optionsPage a.infoLink:active, #optionsPage a.infoLink:hover {
+                color: #ad5a5a;
+            }
+            
+            #optionsPage div.list {
+                width: 640px;
+                margin: 24px auto;
+                text-align: left;
+                background: #f8f8f8;
+                filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#fefefe', endColorstr='#f3f3f3');
+                background: -webkit-gradient(linear, left top, left bottom, from(#fefefe), to(#f3f3f3));
+                background: -moz-linear-gradient(center top , #FEFEFE, #F3F3F3) repeat scroll 0 0 transparent;
+                background: -o-linear-gradient(top, #fefefe, #f3f3f3);
+                border: 1px solid #A9BBDF;
+                border-radius: 2px;
+                box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.35);
+                padding: 8px;
+            }
+            
+            #optionsPage div.row {
+                margin-top: 6px;
+            }
+            
+            #optionsPage div.row:first-child {
+                margin-top: 0 !important;
+            }
+            
+            #optionsPage div.list div.button {
+                float: left;
+            }
+            
+            #optionsPage div.list div.name {
+                float: left;
+                margin-left: 8px;
+                line-height: 25px;
+                width: 540px;
+                font-size: 14px;
+            }
+            
+            #optionsPage div.list div.button input {
+                -moz-user-select: none;
+                background: #7b98d9;
+                filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#7b98d9', endColorstr='#5c79bb');
+                background: -webkit-gradient(linear, left top, left bottom, from(#7b98d9), to(#5c79bb));
+                background: -moz-linear-gradient(center top , #7b98d9, #5c79bb) repeat scroll 0 0 transparent;
+                background: -o-linear-gradient(top, #7b98d9, #5c79bb);
+                border-radius: 2px;
+                border: 1px solid #678AC7;
+                box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+                color: #ffffff;
+                direction: ltr;
+                font-family: Arial,sans-serif;
+                font-size: 12px;
+                font-weight: normal;
+                overflow: hidden;
+                padding: 4px 8px;
+                text-align: center;
+                cursor: pointer;
+            }
+            
+            #optionsPage div.list div.button input.disabled {
+                opacity: 0.5;
+                -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
+                filter: alpha(opacity=50);
+                cursor: default;
+            }
+            
+            #loginButton {
+                margin: 24px 0 0;
+                text-align: center;
+                border-top: 1px solid #678ac7;
+                background: #ffffff;
+                background: linear-gradient(to bottom, #efefef, #ffffff);
+                background: -moz-linear-gradient(center top, #efefef, #ffffff) repeat scroll 0 0 transparent;
+                background: -ms-linear-gradient(top, #efefef, #ffffff);
+                background: -o-linear-gradient(top, #efefef, #ffffff);
+                background: -webkit-gradient(linear, left top, left bottom, from(#efefef), to(#ffffff));
+            }
+            
+            #loginButton .button {
+                display: inline-block;
+                margin-left: 2px;
+                -moz-user-select: none;
+                background: #7b98d9;
+                background: linear-gradient(to bottom, #7b98d9, #5c79bb);
+                background: -moz-linear-gradient(center top , #7b98d9, #5c79bb) repeat scroll 0 0 transparent;
+                background: -ms-linear-gradient(top, #7b98d9, #5c79bb);
+                background: -o-linear-gradient(top, #7b98d9, #5c79bb);
+                background: -webkit-gradient(linear, left top, left bottom, from(#7b98d9), to(#5c79bb));
+                border-radius: 2px;
+                border: 1px solid #678AC7;
+                box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+                color: #ffffff;
+                direction: ltr;
+                font-family: Arial,sans-serif;
+                font-size: 14px;
+                font-weight: normal;
+                overflow: hidden;
+                padding: 6px 8px;
+                text-align: center;
+                cursor: pointer;
+                margin: 12px 6px 12px 2px;
+                text-decoration: none;
+            }
+        </style>
+        
+        <div id="optionsPage">
+            <div class="list clearfix">
+                            <div class="row clearfix">
+                        <div class="button">
+                            <input type="button" title="Login Required" disabled="disabled" class="disabled" onClick="window.location='http://earthexplorer.usgs.gov/download/4923/LC80260312014079LGN00/FR_REFL/EE'" value="Download">  
+                        </div>
+                        <div class="name">
+                            LandsatLook "Natural Color" Image (5.0 MB) (Login Required)                                    </div>
+                    </div>
+                            <div class="row clearfix">
+                        <div class="button">
+                            <input type="button" title="Login Required" disabled="disabled" class="disabled" onClick="window.location='http://earthexplorer.usgs.gov/download/4923/LC80260312014079LGN00/FR_THERM/EE'" value="Download">  
+                        </div>
+                        <div class="name">
+                            LandsatLook "Thermal" Image (1.8 MB) (Login Required)                                    </div>
+                    </div>
+                            <div class="row clearfix">
+                        <div class="button">
+                            <input type="button" title="Login Required" disabled="disabled" class="disabled" onClick="window.location='http://earthexplorer.usgs.gov/download/4923/LC80260312014079LGN00/FR_QB/EE'" value="Download">  
+                        </div>
+                        <div class="name">
+                            LandsatLook "Quality" Image (939.2 KB) (Login Required)                                    </div>
+                    </div>
+                            <div class="row clearfix">
+                        <div class="button">
+                            <input type="button" title="Download this Product"  onClick="window.location='http://earthexplorer.usgs.gov/download/4923/LC80260312014079LGN00/FR_BUND/EE'" value="Download">  
+                        </div>
+                        <div class="name">
+                            LandsatLook images with Geographic Reference (7.7 MB)                                    </div>
+                    </div>
+                            <div class="row clearfix">
+                        <div class="button">
+                            <input type="button" title="Login Required" disabled="disabled" class="disabled" onClick="window.location='http://earthexplorer.usgs.gov/download/4923/LC80260312014079LGN00/STANDARD/EE'" value="Download">  
+                        </div>
+                        <div class="name">
+                            Level 1 GeoTIFF Data Product (919.9 MB) (Login Required)                                    </div>
+                    </div>
+                    </div>
+        
+                    <div id="loginButton">
+                    <a class="button" href="https://earthexplorer.usgs.gov/login">Login</a>
+                </div>
+            </div>
+        
+        <!-- BEGIN USGS Footer Template -->
+                <div id="footer">
+                    <div id="usgsfooter">
+                        <p id="usgsfooterbar">
+                            <a target='new' title="Accessibility Policy (Section 508)" href="http://www.usgs.gov/laws/accessibility.html">Accessibility</a>
+                            <a target='new' title="Freedom of Information Act" href="http://www.usgs.gov/foia/">FOIA</a>
+                            <a target='new' title="Privacy policies of the U.S. Geological Survey." href="http://www.usgs.gov/laws/privacy.html">Privacy</a>
+                            <a target='new' title="Policies and notices that govern information posted on USGS Web sites." href="http://www.usgs.gov/laws/policies_notices.html">Policies and Notices</a>
+                            <a target='new' title="References to non-U.S. Department of the Interior (DOI) products do not constitute an endorsement by the DOI. By viewing the Google Maps API on this web site the user agrees to these TERMS of Service set forth by Google" href="http://code.google.com/apis/maps/terms.html">Google Maps API Disclaimer</a>
+                        </p>
+                        <p id="usgsfootertext">
+                            <a href="http://www.takepride.gov/">
+                                <img height="58" width="60" title="Take Pride in America Home Page" alt="Take Pride in America logo" src="/images/footer/footer_graphic_takePride.jpg"/>
+                            </a>
+                            <a href="http://usa.gov/">
+                                <img height="26" width="90" title="USAGov: Government Made Easy" alt="USA.gov logo" src="/images/footer/footer_graphic_usagov.jpg"/>
+                            </a>
+                            <a href="http://www.doi.gov/">U.S. Department of the Interior</a>
+                            <a href="http://www.usgs.gov/">U.S. Geological Survey</a>
+                            <br/>
+                            URL: http://earthexplorer.usgs.gov                    <br/>
+                            Page Contact Information:
+                            <a href="mailto:lta@usgs.gov">lta@usgs.gov</a>
+                            <br/>
+                            Page Last Modified:
+                            11/03/2014                                    </p>
+                    </div>
+                </div>
+        <!-- END USGS Footer Template -->
+        
+        <script type="text/javascript">
+        
+          var _gaq = _gaq || [];
+          _gaq.push(['ee._setAccount', 'UA-21295076-1']);
+          _gaq.push(['ee._trackPageview']);
+          _gaq.push(['lta._setAccount', 'UA-21295076-2']);
+          _gaq.push(['lta._trackPageview']);
+        
+        </script>
+        <script type="text/javascript" src="http://www.usgs.gov/scripts/analytics/usgs-analytics.js"></script>
+        
+        
+            </body>
+        </html>

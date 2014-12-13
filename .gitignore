@@ -1,3 +1,4 @@
+.DS_Store
 *.TIF
 *.vcxproj
 *.filters
@@ -39,3 +40,4 @@ PrototypesFor Gary/test.cpp
 LandsatLook/LandsatLook.dir/Debug/LandsatLook.unsuccessfulbuild
 LandsatLook/Data/LC80250302014232LGN00_MTL.txt
 LandsatLook/Data/LC80260312014191LGN00_MTL.txt
+!earthexplorer/*
